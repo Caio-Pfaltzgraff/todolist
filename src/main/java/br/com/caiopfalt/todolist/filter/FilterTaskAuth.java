@@ -15,7 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 @Component
-public class FilterTaskAuth extends OncePerRequestFilter{
+public class FilterTaskAuth extends OncePerRequestFilter {
 
     @Autowired
     private UserRepository userRepository;
@@ -24,39 +24,47 @@ public class FilterTaskAuth extends OncePerRequestFilter{
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        //Pegar a autenticação(usuario e senha)
-        var authorization = request.getHeader("Authorization");
+        var servletPath = request.getServletPath();
+        
+        if(servletPath.startsWith("/tasks")) {
 
-        var authEncoded = authorization.substring("Basic".length()).trim();
+            //Pegar a autenticação(usuario e senha)
+            var authorization = request.getHeader("Authorization");
 
-        byte[] authDecode = Base64.getDecoder().decode(authEncoded);
+            var authEncoded = authorization.substring("Basic".length()).trim();
 
-        var authString = new String(authDecode);
+            byte[] authDecode = Base64.getDecoder().decode(authEncoded);
 
-        String[] credentials = authString.split(":");
-        String username = credentials[0];
-        String password = credentials[1];
+            var authString = new String(authDecode);
 
-        System.out.println("Authorization");
-        System.out.println(username);
-        System.out.println(password);
+            String[] credentials = authString.split(":");
+            String username = credentials[0];
+            String password = credentials[1];
 
-        // Validar usuário
-        var user = userRepository.findByUsername(username);
-        if(user == null) {
-            response.sendError(401);
-        } else {
-            //Validar senha
-            var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
-            if(passwordVerify.verified) {
-                // Segue viagem
-                filterChain.doFilter(request, response);
-            } else {
+            System.out.println("Authorization");
+            System.out.println(username);
+            System.out.println(password);
+
+            // Validar usuário
+            var user = userRepository.findByUsername(username);
+            if(user == null) {
                 response.sendError(401);
+            } else {
+                //Validar senha
+                var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
+                if(passwordVerify.verified) {
+                    request.setAttribute("idUser", user.getId());
+                    // Segue viagem
+                    System.out.println("Usuário passou pelo filtro");
+                    filterChain.doFilter(request, response);
+                } else {
+                    response.sendError(401);
+                }
             }
-            
+        } else {
+            filterChain.doFilter(request, response);
         }
         
     }
-    
+
 }
